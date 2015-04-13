@@ -20,6 +20,8 @@ import com.weisong.test.codec.EchoMessageCodec;
  */
 public class EchoClient {
 
+	static public int numberOfRequests = 10000;
+	
     private final String host;
     private final int port;
 
@@ -64,16 +66,18 @@ public class EchoClient {
 
     public static void main(String[] args) throws Exception {
         // Print usage if no argument is specified.
-        if (args.length < 2 || args.length > 3) {
-            System.err.println(
-                    "Usage: " + EchoClient.class.getSimpleName() +
-                    " <host> <port>");
+        if (args.length != 3) {
+            System.err.println("Usage:");
+            System.err.println("    java " + EchoClient.class.getSimpleName() + 
+            		" <host> <port> <number-of-requests>");
             return;
         }
 
         // Parse options.
         final String host = args[0];
         final int port = Integer.parseInt(args[1]);
+        
+        EchoClient.numberOfRequests = Integer.valueOf(args[2]);
 
         new EchoClient(host, port).run();
         

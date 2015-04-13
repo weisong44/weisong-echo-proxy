@@ -42,8 +42,6 @@ public class ProxyUtil {
 				msg.getClass().getSimpleName(), getConnString(channel)));
 		}
 	}
-
-	
 	
 	static public String createRandomString(int length) {
 		byte[] bytes = new byte[length];

@@ -26,6 +26,8 @@ import com.weisong.test.util.ProxyUtil;
 
 public class EchoProxyEngine {
 
+	private boolean shutdown;
+	
 	private Timer timer = new Timer();
 	// Server connection string and connections
 	private String[] serverConnStrings;
@@ -58,13 +60,46 @@ public class EchoProxyEngine {
 			});
 
 		timer.schedule(new HousekeepingTask(), 0, 1000);
+		
+		Runtime.getRuntime().addShutdownHook(new ShutdownHook());
 	}
 
 	public void shutdown() {
         eventLoop.shutdownGracefully();
 	}
 	
-	public class HousekeepingTask extends TimerTask {
+	private class ShutdownHook extends Thread {
+		public void run() {
+			
+			shutdown = true;
+			
+			long waitTime = 5000;
+			long shutdownTime = System.currentTimeMillis() + waitTime;
+			while(reqeustContextMap.isEmpty() == false) {
+				if(System.currentTimeMillis() > shutdownTime) {
+					break;
+				}
+				
+				try {
+					Thread.sleep(200);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+
+			int size = reqeustContextMap.size();
+			if(size <= 0) {
+				System.out.println("Completed all pending requests, shutdown ...");
+			}
+			else {
+				System.out.println(String.format(
+					"Forcefully shutdown after %d ms, dropping %d pending requests", 
+					waitTime, size));
+			}
+		}
+	}
+	
+	private class HousekeepingTask extends TimerTask {
 		@Override
 		public void run() {
 
@@ -137,10 +172,22 @@ public class EchoProxyEngine {
 		logger.info(String.format("Disconnected from %s", connString));
 	}
 	
+	public void connectedToClient(Channel channel) {
+		if(shutdown) {
+			logger.info(String.format("Shutting down, close connection to %s", 
+					ProxyUtil.getConnString(channel)));
+			channel.close();
+		}
+	}
+	
 	public void receivedMessageFromClient(Channel clientChannel, EchoRequest request) {
 		EchoRequestContext ctx = null;
 		try {
 			logger.fine("Received request from client: " + request.getId());
+			if(shutdown) {
+				ProxyUtil.sendError(clientChannel, request.getId(), "Proxy shutting down");
+			}
+			
 			Channel serverChannel = getNextServerChannel();
 			if(serverChannel != null) {
 				ctx = new EchoRequestContext(clientChannel, serverChannel, request, reqeustContextMap);

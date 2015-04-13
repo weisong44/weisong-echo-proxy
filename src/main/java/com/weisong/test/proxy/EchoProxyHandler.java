@@ -21,6 +21,10 @@ public class EchoProxyHandler {
 	    private EchoProxyEngine engine;
 
 		@Override
+		public void channelActive(ChannelHandlerContext ctx) throws Exception {
+		}
+
+		@Override
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 	        ctx.close();
 	        engine.disconnectedFromClient(ctx.channel());

@@ -18,7 +18,6 @@ public class EchoClientHandler extends ChannelInboundHandlerAdapter {
             EchoClientHandler.class.getName());
     
     static private int index;
-    final static private int totalCount = 10000;
     final static private AtomicInteger count = new AtomicInteger();
 
     static private long startTime = -1L;
@@ -36,9 +35,9 @@ public class EchoClientHandler extends ChannelInboundHandlerAdapter {
 		}
 		
 		public void send() {
-			if(count.incrementAndGet() > totalCount) {
+			if(count.incrementAndGet() > EchoClient.numberOfRequests) {
 				long time = System.nanoTime() - startTime;
-				float throughput = 1000000000.0f * totalCount / time;
+				float throughput = 1000000000.0f * EchoClient.numberOfRequests / time;
 				System.out.println(String.format("Total time: %.2f ms", 1.0f * time / 1000000));
 				System.out.println(String.format("Throughput: %.2f/s", throughput));
 				System.exit(0);
