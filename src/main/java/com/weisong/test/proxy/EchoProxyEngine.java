@@ -34,7 +34,7 @@ public class EchoProxyEngine {
 	// Server connection map
 	private ArrayList<Channel> serverConnections = new ArrayList<>();
 	// Request map
-	private Map<String, EchoRequestContext> reqeustContextMap = new ConcurrentHashMap<>();
+	private Map<String, EchoRequestContext> requestContextMap = new ConcurrentHashMap<>();
 
 	private Bootstrap serverBootstrap;
     private EventLoopGroup eventLoop = new NioEventLoopGroup();
@@ -64,10 +64,6 @@ public class EchoProxyEngine {
 		Runtime.getRuntime().addShutdownHook(new ShutdownHook());
 	}
 
-	public void shutdown() {
-        eventLoop.shutdownGracefully();
-	}
-	
 	private class ShutdownHook extends Thread {
 		public void run() {
 			
@@ -75,7 +71,12 @@ public class EchoProxyEngine {
 			
 			long waitTime = 5000;
 			long shutdownTime = System.currentTimeMillis() + waitTime;
-			while(reqeustContextMap.isEmpty() == false) {
+			while(requestContextMap.isEmpty() == false) {
+				
+				System.out.println(String.format(
+					"Shutting down, waiting for %d pending requests to complete ...", 
+					requestContextMap.size()));
+				
 				if(System.currentTimeMillis() > shutdownTime) {
 					break;
 				}
@@ -87,15 +88,17 @@ public class EchoProxyEngine {
 				}
 			}
 
-			int size = reqeustContextMap.size();
+			int size = requestContextMap.size();
 			if(size <= 0) {
-				System.out.println("Completed all pending requests, shutdown ...");
+				System.out.println("Completed all pending requests, shutdown!");
 			}
 			else {
 				System.out.println(String.format(
-					"Forcefully shutdown after %d ms, dropping %d pending requests", 
+					"Forcefully shutdown after %d ms, dropping %d pending requests!", 
 					waitTime, size));
 			}
+			
+	        eventLoop.shutdownGracefully();
 		}
 	}
 	
@@ -105,7 +108,7 @@ public class EchoProxyEngine {
 
 			Map<String, Integer> connCountMap = new HashMap<>();
 			for(Channel c : serverConnections) {
-				String connString = ProxyUtil.getConnString(c);
+				String connString = ProxyUtil.getRemoteConnString(c);
 				Integer count = connCountMap.get(connString);
 				if(count == null) {
 					count = 0;
@@ -162,20 +165,20 @@ public class EchoProxyEngine {
 	}
 	
 	public void disconnectedFromServer(Channel channel) {
-		String connString = ProxyUtil.getConnString(channel);
+		String connString = ProxyUtil.getRemoteConnString(channel);
 		serverConnections.remove(channel);
 		logger.info(String.format("Disconnected from %s", connString));
 	}
 	
 	public void disconnectedFromClient(Channel channel) {
-		String connString = ProxyUtil.getConnString(channel);
+		String connString = ProxyUtil.getRemoteConnString(channel);
 		logger.info(String.format("Disconnected from %s", connString));
 	}
 	
 	public void connectedToClient(Channel channel) {
 		if(shutdown) {
 			logger.info(String.format("Shutting down, close connection to %s", 
-					ProxyUtil.getConnString(channel)));
+					ProxyUtil.getRemoteConnString(channel)));
 			channel.close();
 		}
 	}
@@ -190,11 +193,11 @@ public class EchoProxyEngine {
 			
 			Channel serverChannel = getNextServerChannel();
 			if(serverChannel != null) {
-				ctx = new EchoRequestContext(clientChannel, serverChannel, request, reqeustContextMap);
+				ctx = new EchoRequestContext(clientChannel, serverChannel, request, requestContextMap);
 				timer.schedule(ctx.timeoutTask, new Date(ctx.timeoutTime));
 				logger.fine(String.format("Scheduled timeout task at %s", new Date(ctx.timeoutTime)));
-				reqeustContextMap.put(ctx.getId(), ctx);
-				request.setUserData(ProxyUtil.getConnString(clientChannel));
+				requestContextMap.put(ctx.getId(), ctx);
+				request.setUserData(ProxyUtil.getRemoteConnString(clientChannel));
 				ProxyUtil.sendMessage(serverChannel, request);
 				logger.fine("Forwarded request to server: " + request.getId());
 			}
@@ -203,7 +206,7 @@ public class EchoProxyEngine {
 			}
 		} 
 		catch (Throwable t) {
-			String connString = ProxyUtil.getConnString(clientChannel);
+			String connString = ProxyUtil.getRemoteConnString(clientChannel);
 			logger.severe(String.format("Failed to process request from %s: %s", connString, t.getMessage()));
 			ProxyUtil.sendError(clientChannel, t.getMessage());
 			if(ctx != null) {
@@ -219,10 +222,10 @@ public class EchoProxyEngine {
 			logger.fine("Received resposne from server: " + response.getRequestId());
 			String clientConnId = response.getUserData();
 			String ctxId = EchoRequestContext.getContextId(clientConnId, serverChannel, response.getRequestId());
-			ctx = reqeustContextMap.remove(ctxId);
+			ctx = requestContextMap.remove(ctxId);
 			if(ctx == null) {
 				logger.warning(String.format("Failed to find matching request for response %s from %s",
-					response.getRequestId(), ProxyUtil.getConnString(serverChannel)));
+					response.getRequestId(), ProxyUtil.getRemoteConnString(serverChannel)));
 				return;
 			}
 			ProxyUtil.sendMessage(ctx.clientChannel, response);
@@ -230,8 +233,8 @@ public class EchoProxyEngine {
 			
 			float t = 1.0f * (System.nanoTime() - ctx.startTime) / 1000000;
 			String message = String.format("%s => %s %d %.2f ms", 
-				ProxyUtil.getConnString(ctx.clientChannel), 
-				ProxyUtil.getConnString(ctx.serverChannel), 
+				ProxyUtil.getRemoteConnString(ctx.clientChannel), 
+				ProxyUtil.getRemoteConnString(ctx.serverChannel), 
 				ctx.requestId, t);
 			System.out.println(message);
 		}

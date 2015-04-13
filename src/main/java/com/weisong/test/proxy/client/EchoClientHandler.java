@@ -48,10 +48,10 @@ public class EchoClientHandler extends ChannelInboundHandlerAdapter {
 			}
 		}
 		
-		public void received(EchoResponse response) {
+		public void received(ChannelHandlerContext ctx, EchoResponse response) {
 			float t = 1.0f * (System.nanoTime() - st) / 1000000;
-		    System.out.println(String.format("[%.2f][%s] Received response: %d %s %.2f ms",
-	    		getElapsedTime(startTime), getName(), 
+		    System.out.println(String.format("[%.2f][%s][%s] Received response: %d %s %.2f ms",
+	    		getElapsedTime(startTime), getName(), ProxyUtil.getLocalConnString(ctx.channel()),
 	    		response.getRequestId(), response.getHasError(), t));
 		    send();
 		}
@@ -95,10 +95,15 @@ public class EchoClientHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
+	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+		System.exit(0);
+	}
+
+	@Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
     	if(msg instanceof EchoResponse) {
     		EchoResponse response = (EchoResponse) msg;
-    		worker.received(response);
+    		worker.received(ctx, response);
     	}
     	
     }

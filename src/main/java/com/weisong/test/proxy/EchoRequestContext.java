@@ -20,14 +20,14 @@ public class EchoRequestContext {
 	public Map<String, EchoRequestContext> reqeustContextMap;
 
 	static public String getContextId(Channel clientChannel, Channel serverChannel, long requestId) {
-		String clientConnId = ProxyUtil.getConnString(clientChannel); 
+		String clientConnId = ProxyUtil.getRemoteConnString(clientChannel); 
 		return getContextId(clientConnId, serverChannel, requestId);
 	}
 
 	static public String getContextId(String clientConnId, Channel serverChannel, long requestId) {
 		StringBuffer sb = new StringBuffer();
 		sb.append(clientConnId).append("-")
-			.append(ProxyUtil.getConnString(serverChannel)).append("-")
+			.append(ProxyUtil.getRemoteConnString(serverChannel)).append("-")
 			.append(requestId);
 		return sb.toString();
 	}

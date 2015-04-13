@@ -47,7 +47,7 @@ public class EchoMessageCodec extends ByteToMessageCodec<EchoMessage> {
 			int length = in.readInt();
 			if(length > 1000000) {
 				logger.warning(String.format("%s Frame length too large, discard 1 byte: %d", 
-					ProxyUtil.getConnString(ctx.channel()), length));
+					ProxyUtil.getRemoteConnString(ctx.channel()), length));
 				in.readerIndex(begin + 1);
 				continue;
 			}
@@ -79,7 +79,7 @@ public class EchoMessageCodec extends ByteToMessageCodec<EchoMessage> {
 				in.readerIndex(begin + length + 6);
 				logger.warning(String.format(
 					"%s Failed to decode payload, discard %d bytes: %s", 
-					ProxyUtil.getConnString(ctx.channel()), length + 6, json));
+					ProxyUtil.getRemoteConnString(ctx.channel()), length + 6, json));
 			}
 		}
 	}
@@ -92,7 +92,7 @@ public class EchoMessageCodec extends ByteToMessageCodec<EchoMessage> {
 				if(skipCount > 0) {
 					logger.warning(String.format(
 						"%s Discarded %d bytes to find frame beginning", 
-						ProxyUtil.getConnString(ctx.channel()), skipCount));
+						ProxyUtil.getRemoteConnString(ctx.channel()), skipCount));
 				}
 				return true;
 			}
@@ -101,7 +101,7 @@ public class EchoMessageCodec extends ByteToMessageCodec<EchoMessage> {
 		if(skipCount > 0) {
 			logger.warning(String.format(
 				"%s Discarded %d bytes, still missing frame beginning", 
-				ProxyUtil.getConnString(ctx.channel()), skipCount));
+				ProxyUtil.getRemoteConnString(ctx.channel()), skipCount));
 		}
 		return false;
 	}

@@ -2,6 +2,7 @@ package com.weisong.test.util;
 
 import io.netty.channel.Channel;
 
+import java.net.SocketAddress;
 import java.util.Random;
 import java.util.logging.Logger;
 
@@ -14,12 +15,20 @@ public class ProxyUtil {
     
     static private final Random random = new Random();
 	
-	static public String getConnString(Channel channel) {
-		String remoteAddr = channel.remoteAddress().toString();
-		if(remoteAddr.contains("/")) {
-			remoteAddr = remoteAddr.substring(remoteAddr.indexOf("/") + 1);
+	static public String getConnString(SocketAddress address) {
+		String addrStr = address.toString();
+		if(addrStr.contains("/")) {
+			addrStr = addrStr.substring(addrStr.indexOf("/") + 1);
 		}
-		return remoteAddr;
+		return addrStr;
+	}
+	
+	static public String getLocalConnString(Channel channel) {
+		return getConnString(channel.localAddress());
+	}
+	
+	static public String getRemoteConnString(Channel channel) {
+		return getConnString(channel.remoteAddress());
 	}
 	
 	static public void sendError(Channel channel, String errMsg) {
@@ -39,7 +48,7 @@ public class ProxyUtil {
 			channel.writeAndFlush(msg);
 		} catch (Exception e) {
 			logger.severe(String.format("Failed to send %s to %s", 
-				msg.getClass().getSimpleName(), getConnString(channel)));
+				msg.getClass().getSimpleName(), getRemoteConnString(channel)));
 		}
 	}
 	

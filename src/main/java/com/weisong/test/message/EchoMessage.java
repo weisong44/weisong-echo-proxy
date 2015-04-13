@@ -9,7 +9,7 @@ public class EchoMessage {
 	private String className = String.format("%s%s%s", 
 			classNameMarker, getClass().getName(), classNameMarker);
 	private String userData;
-	private String data = ProxyUtil.createRandomString(128); 
+	private String data = ProxyUtil.createRandomString(128000); 
 
 	public String getClassName() {
 		return className;
