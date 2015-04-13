@@ -29,20 +29,27 @@ public class EchoProxyEngine {
 
 	final static private SimpleDateFormat df = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss.SSS z");
 	
+	final private Logger logger = Logger.getLogger(getClass().getName());
+
+	// Shutdown flag
 	private boolean shutdown;
 	
+	// The Timer
 	private Timer timer = new Timer();
+	
 	// Server connection string and connections
 	private String[] serverConnStrings;
 	// Server connection map
 	private ArrayList<Channel> serverConnections = new ArrayList<>();
+	// Index to select a server
+	private int serverSelectionIndex;
+
 	// Request map
 	private Map<String, EchoRequestContext> requestContextMap = new ConcurrentHashMap<>();
 
+	// The server connection stack
 	private Bootstrap serverBootstrap;
     private EventLoopGroup eventLoop = new NioEventLoopGroup();
-    
-	final private Logger logger = Logger.getLogger(getClass().getName());
     
 	public EchoProxyEngine(String[] serverConnStrings) {
 		
@@ -260,7 +267,6 @@ public class EchoProxyEngine {
 		}
 	}
 
-	private int serverSelectionIndex;
 	private Channel getNextServerChannel() {
 		serverSelectionIndex = ++serverSelectionIndex % serverConnections.size(); 
 		return serverConnections.get(serverSelectionIndex);
@@ -274,9 +280,9 @@ public class EchoProxyEngine {
 			long startTime, long requestId, boolean error) {
 		String serverConnString = serverChannel == null ? 
 				"Unknown" : ProxyUtil.getRemoteConnString(serverChannel);
-		String result = error ? "ERR" : "OK ";
+		String result = error ? "ER" : "OK";
 		float t = 1.0f * (System.nanoTime() - startTime) / 1000000;
-		String message = String.format("[%s] [%s] %s => [P] => %s %d %.2f ms",
+		String message = String.format("[%s][%s] %s => [P] => %s %d %.2f ms",
 			df.format(new Date()), result,
 			ProxyUtil.getRemoteConnString(clientChannel), 
 			serverConnString, 
