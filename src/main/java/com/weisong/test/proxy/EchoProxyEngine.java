@@ -10,6 +10,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -26,6 +27,8 @@ import com.weisong.test.util.ProxyUtil;
 
 public class EchoProxyEngine {
 
+	final static private SimpleDateFormat df = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss.SSS z");
+	
 	private boolean shutdown;
 	
 	private Timer timer = new Timer();
@@ -69,13 +72,17 @@ public class EchoProxyEngine {
 			
 			shutdown = true;
 			
+			System.out.println(String.format(
+					"[%s] Shutdown initiated", 
+					df.format(new Date()), requestContextMap.size()));
+			
 			long waitTime = 5000;
 			long shutdownTime = System.currentTimeMillis() + waitTime;
 			while(requestContextMap.isEmpty() == false) {
 				
 				System.out.println(String.format(
-					"Shutting down, waiting for %d pending requests to complete ...", 
-					requestContextMap.size()));
+					"[%s] Waiting for %d pending requests to complete ...", 
+					df.format(new Date()), requestContextMap.size()));
 				
 				if(System.currentTimeMillis() > shutdownTime) {
 					break;
@@ -90,14 +97,16 @@ public class EchoProxyEngine {
 
 			int size = requestContextMap.size();
 			if(size <= 0) {
-				System.out.println("Completed all pending requests, shutdown!");
+				System.out.println(String.format(
+					"[%s] Completed all pending requests, shutdown gracefully!", 
+					df.format(new Date())));
 			}
 			else {
 				System.out.println(String.format(
-					"Forcefully shutdown after %d ms, dropping %d pending requests!", 
-					waitTime, size));
+					"[%s] Forcefully shutdown after %d ms, dropping %d pending requests!", 
+					df.format(new Date()), waitTime, size));
 			}
-			
+
 	        eventLoop.shutdownGracefully();
 		}
 	}
@@ -159,6 +168,7 @@ public class EchoProxyEngine {
 			if(ctx.reqeustContextMap.remove(ctx.getId()) != null) {
 				logger.fine(String.format("TimerTask removed context %s", ctx.getId()));
 				ProxyUtil.sendError(ctx.clientChannel, ctx.requestId, "Timed out!");
+				printAccessLog(ctx, true);
 			}
 		}
 		
@@ -189,6 +199,8 @@ public class EchoProxyEngine {
 			logger.fine("Received request from client: " + request.getId());
 			if(shutdown) {
 				ProxyUtil.sendError(clientChannel, request.getId(), "Proxy shutting down");
+				printAccessLog(clientChannel, null, System.nanoTime(), request.getId(), true);
+				return;
 			}
 			
 			Channel serverChannel = getNextServerChannel();
@@ -203,12 +215,14 @@ public class EchoProxyEngine {
 			}
 			else {
 				ProxyUtil.sendError(clientChannel, request.getId(), "No server available");
+				printAccessLog(ctx, true);
 			}
 		} 
 		catch (Throwable t) {
 			String connString = ProxyUtil.getRemoteConnString(clientChannel);
 			logger.severe(String.format("Failed to process request from %s: %s", connString, t.getMessage()));
 			ProxyUtil.sendError(clientChannel, t.getMessage());
+			printAccessLog(ctx, true);
 			if(ctx != null) {
 				ctx.timeoutTask.cancel();
 				logger.fine(String.format("Cancelled timeout task at %s", new Date(ctx.timeoutTime)));
@@ -229,18 +243,13 @@ public class EchoProxyEngine {
 				return;
 			}
 			ProxyUtil.sendMessage(ctx.clientChannel, response);
+			printAccessLog(ctx, response.getHasError());
 			logger.fine("Forwarded response to client: " + response.getRequestId());
-			
-			float t = 1.0f * (System.nanoTime() - ctx.startTime) / 1000000;
-			String message = String.format("%s => %s %d %.2f ms", 
-				ProxyUtil.getRemoteConnString(ctx.clientChannel), 
-				ProxyUtil.getRemoteConnString(ctx.serverChannel), 
-				ctx.requestId, t);
-			System.out.println(message);
 		}
 		catch (Throwable t) {
 			if(ctx != null) {
 				ProxyUtil.sendError(ctx.clientChannel, t.getMessage());
+				printAccessLog(ctx, true);
 			}
 		}
 		finally {
@@ -255,5 +264,23 @@ public class EchoProxyEngine {
 	private Channel getNextServerChannel() {
 		serverSelectionIndex = ++serverSelectionIndex % serverConnections.size(); 
 		return serverConnections.get(serverSelectionIndex);
+	}
+	
+	static private void printAccessLog(EchoRequestContext ctx, boolean error) {
+		printAccessLog(ctx.clientChannel, ctx.serverChannel, ctx.startTime, ctx.requestId, error);
+	}
+	
+	static private void printAccessLog(Channel clientChannel, Channel serverChannel, 
+			long startTime, long requestId, boolean error) {
+		String serverConnString = serverChannel == null ? 
+				"Unknown" : ProxyUtil.getRemoteConnString(serverChannel);
+		String result = error ? "ERR" : "OK ";
+		float t = 1.0f * (System.nanoTime() - startTime) / 1000000;
+		String message = String.format("[%s] [%s] %s => [P] => %s %d %.2f ms",
+			df.format(new Date()), result,
+			ProxyUtil.getRemoteConnString(clientChannel), 
+			serverConnString, 
+			requestId, t);
+		System.out.println(message);
 	}
 }

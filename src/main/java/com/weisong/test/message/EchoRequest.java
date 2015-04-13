@@ -1,10 +1,12 @@
 package com.weisong.test.message;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 public class EchoRequest extends EchoMessage {
 	
-	static public long seq; 
+	static public AtomicLong seq = new AtomicLong(); 
 	
-	private long id = ++seq;
+	private long id = seq.incrementAndGet();
 	private String message;
 
 	protected EchoRequest() {
