@@ -1,12 +1,11 @@
 package com.weisong.test.proxy;
 
+import io.netty.channel.Channel;
+
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 
-import io.netty.channel.Channel;
-
 import com.weisong.test.message.EchoRequest;
-import com.weisong.test.proxy.EchoProxyEngine.TimeoutTask;
 import com.weisong.test.util.ProxyUtil;
 
 
@@ -17,7 +16,6 @@ public class EchoRequestContext {
 	public long requestId;
 	public Channel clientChannel;
 	public Channel serverChannel;
-	public TimeoutTask timeoutTask;
 	public ScheduledFuture<?> timeoutTaskFuture;
 	public Map<String, EchoRequestContext> reqeustContextMap;
 
@@ -33,10 +31,6 @@ public class EchoRequestContext {
 		  .append(requestId);
 		return sb.toString();
 	}
-
-	public String getId() {
-		return getContextId(clientChannel, serverChannel, requestId);
-	}
 	
 	public EchoRequestContext(Channel clientChannel, Channel serverChannel, 
 			EchoRequest request, Map<String, EchoRequestContext> reqeustContextMap) {
@@ -45,6 +39,9 @@ public class EchoRequestContext {
 		this.requestId = request.getId();
 		this.reqeustContextMap = reqeustContextMap;
 		this.timeout = request.getTimeout();
-		this.timeoutTask = new TimeoutTask(this);
+	}
+
+	public String getId() {
+		return getContextId(clientChannel, serverChannel, requestId);
 	}
 }

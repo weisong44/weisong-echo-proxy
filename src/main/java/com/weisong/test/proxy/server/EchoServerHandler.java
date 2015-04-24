@@ -33,7 +33,7 @@ public class EchoServerHandler extends ChannelInboundHandlerAdapter {
     			new Thread() {
     				public void run() {
     					try {
-    						System.out.println("Count = " + count.get());
+    						System.out.println("Delay request for 110 ms, counter=" + count.get());
 							sleep(110);
 						} catch (InterruptedException e) {
 							e.printStackTrace();

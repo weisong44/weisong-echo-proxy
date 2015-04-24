@@ -172,7 +172,6 @@ public class EchoProxyEngine {
 		
 		public TimeoutTask(EchoRequestContext ctx) {
 			this.ctx = ctx;
-			this.ctx.timeoutTask = this;
 		}
 		
 		@Override
@@ -225,7 +224,8 @@ public class EchoProxyEngine {
 				requestContextMap.put(ctx.getId(), ctx);
 				request.setUserData(ProxyUtil.getRemoteConnString(clientChannel));
 				ProxyUtil.sendMessage(serverChannel, request);
-				ctx.timeoutTaskFuture = executor.schedule(ctx.timeoutTask, ctx.timeout, TimeUnit.MILLISECONDS);
+				ctx.timeoutTaskFuture = executor.schedule(
+						new TimeoutTask(ctx), ctx.timeout, TimeUnit.MILLISECONDS);
 				logger.fine(String.format("Scheduled timeout task at %s", 
 						new Date(System.currentTimeMillis() + ctx.timeout)));
 				logger.fine("Forwarded request to server: " + request.getId());
