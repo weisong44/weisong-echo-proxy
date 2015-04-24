@@ -14,14 +14,15 @@ public class EchoProxyHandler {
 
 		final private Logger logger = Logger.getLogger(getClass().getName());
 	    
+	    private EchoProxyEngine engine;
+
 	    public ClientSide(EchoProxyEngine engine) {
 	    	this.engine = engine;
 	    }
 	    
-	    private EchoProxyEngine engine;
-
 		@Override
 		public void channelActive(ChannelHandlerContext ctx) throws Exception {
+			engine.connectedToClient(ctx.channel());
 		}
 
 		@Override
@@ -51,11 +52,11 @@ public class EchoProxyHandler {
 
 		final private Logger logger = Logger.getLogger(getClass().getName());
 	    
+	    private EchoProxyEngine engine;
+	    
 	    public ServerSide(EchoProxyEngine engine) {
 	    	this.engine = engine;
 	    }
-	    
-	    private EchoProxyEngine engine;
 
 		@Override
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {

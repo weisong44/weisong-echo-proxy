@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import com.weisong.test.codec.EchoMessageCodec;
@@ -36,6 +38,9 @@ public class EchoProxyEngine {
 	
 	// The Timer
 	private Timer timer = new Timer();
+	
+	// Scheduling executor
+	ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(2);
 	
 	// Server connection string and connections
 	private String[] serverConnStrings;
@@ -159,10 +164,10 @@ public class EchoProxyEngine {
 		}
 	}
 	
-	static public class TimeoutTask extends TimerTask {
+	static public class TimeoutTask implements Runnable {
 
 		final private Logger logger = Logger.getLogger(getClass().getName());
-		
+
 		private EchoRequestContext ctx;
 		
 		public TimeoutTask(EchoRequestContext ctx) {
@@ -181,23 +186,27 @@ public class EchoProxyEngine {
 		
 	}
 	
-	public void disconnectedFromServer(Channel channel) {
-		String connString = ProxyUtil.getRemoteConnString(channel);
-		serverConnections.remove(channel);
-		logger.info(String.format("Disconnected from %s", connString));
-	}
-	
-	public void disconnectedFromClient(Channel channel) {
-		String connString = ProxyUtil.getRemoteConnString(channel);
-		logger.info(String.format("Disconnected from %s", connString));
-	}
-	
 	public void connectedToClient(Channel channel) {
 		if(shutdown) {
 			logger.info(String.format("Shutting down, close connection to %s", 
 					ProxyUtil.getRemoteConnString(channel)));
 			channel.close();
 		}
+		else {
+			String connString = ProxyUtil.getRemoteConnString(channel);
+			logger.info(String.format("Connected client: %s", connString));
+		}
+	}
+	
+	public void disconnectedFromClient(Channel channel) {
+		String connString = ProxyUtil.getRemoteConnString(channel);
+		logger.info(String.format("Disconnected client: %s", connString));
+	}
+	
+	public void disconnectedFromServer(Channel channel) {
+		String connString = ProxyUtil.getRemoteConnString(channel);
+		serverConnections.remove(channel);
+		logger.info(String.format("Disconnected server: %s", connString));
 	}
 	
 	public void receivedMessageFromClient(Channel clientChannel, EchoRequest request) {
@@ -213,11 +222,12 @@ public class EchoProxyEngine {
 			Channel serverChannel = getNextServerChannel();
 			if(serverChannel != null) {
 				ctx = new EchoRequestContext(clientChannel, serverChannel, request, requestContextMap);
-				timer.schedule(ctx.timeoutTask, new Date(ctx.timeoutTime));
-				logger.fine(String.format("Scheduled timeout task at %s", new Date(ctx.timeoutTime)));
 				requestContextMap.put(ctx.getId(), ctx);
 				request.setUserData(ProxyUtil.getRemoteConnString(clientChannel));
 				ProxyUtil.sendMessage(serverChannel, request);
+				ctx.timeoutTaskFuture = executor.schedule(ctx.timeoutTask, ctx.timeout, TimeUnit.MILLISECONDS);
+				logger.fine(String.format("Scheduled timeout task at %s", 
+						new Date(System.currentTimeMillis() + ctx.timeout)));
 				logger.fine("Forwarded request to server: " + request.getId());
 			}
 			else {
@@ -230,9 +240,9 @@ public class EchoProxyEngine {
 			logger.severe(String.format("Failed to process request from %s: %s", connString, t.getMessage()));
 			ProxyUtil.sendError(clientChannel, t.getMessage());
 			printAccessLog(ctx, true);
-			if(ctx != null) {
-				ctx.timeoutTask.cancel();
-				logger.fine(String.format("Cancelled timeout task at %s", new Date(ctx.timeoutTime)));
+			if(ctx != null && ctx.timeoutTaskFuture != null) {
+				ctx.timeoutTaskFuture.cancel(true);
+				logger.fine(String.format("Cancelled timeout task"));
 			}
 		}
 	}
@@ -245,7 +255,7 @@ public class EchoProxyEngine {
 			String ctxId = EchoRequestContext.getContextId(clientConnId, serverChannel, response.getRequestId());
 			ctx = requestContextMap.remove(ctxId);
 			if(ctx == null) {
-				logger.warning(String.format("Failed to find matching request for response %s from %s",
+				logger.fine(String.format("Failed to find matching request for response %s from %s",
 					response.getRequestId(), ProxyUtil.getRemoteConnString(serverChannel)));
 				return;
 			}
@@ -260,8 +270,8 @@ public class EchoProxyEngine {
 			}
 		}
 		finally {
-			if(ctx != null) {
-				ctx.timeoutTask.cancel();
+			if(ctx != null && ctx.timeoutTaskFuture != null) {
+				ctx.timeoutTaskFuture.cancel(true);
 				logger.fine(String.format("Cancelled timeout task: %d", ctx.requestId));
 			}
 		}

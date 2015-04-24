@@ -40,6 +40,11 @@ public class EchoClientHandler extends ChannelInboundHandlerAdapter {
 				float throughput = 1000000000.0f * EchoClient.numberOfRequests / time;
 				System.out.println(String.format("Total time: %.2f ms", 1.0f * time / 1000000));
 				System.out.println(String.format("Throughput: %.2f/s", throughput));
+				try {
+					Thread.sleep(1000L);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 				System.exit(0);
 			}
 			
@@ -49,10 +54,13 @@ public class EchoClientHandler extends ChannelInboundHandlerAdapter {
 		}
 		
 		public void received(ChannelHandlerContext ctx, EchoResponse response) {
+			String message = response.getHasError() ?
+					"error: " + response.getMessage()
+				  : "response: " + response.getMessage();	
 			float t = 1.0f * (System.nanoTime() - st) / 1000000;
-		    System.out.println(String.format("[%.2f][%s][%s] Received response: %d %s %.2f ms",
+		    System.out.println(String.format("[%.2f][%s][%s] Received response: %d %s %.2f ms - %s",
 	    		getElapsedTime(startTime), getName(), ProxyUtil.getLocalConnString(ctx.channel()),
-	    		response.getRequestId(), response.getHasError(), t));
+	    		response.getRequestId(), response.getHasError(), t, message));
 		    send();
 		}
 		
@@ -68,11 +76,11 @@ public class EchoClientHandler extends ChannelInboundHandlerAdapter {
 						lock.wait();
 					}
 
+					EchoRequest request = new EchoRequest("Ping", 100);
 					st = System.nanoTime();
-					EchoRequest request = new EchoRequest("Ping");
-					ProxyUtil.sendMessage(channel, request);
 					System.out.println(String.format("[%.2f][%s] Send request: %d", 
-						getElapsedTime(startTime), getName(), request.getId()));
+							getElapsedTime(startTime), getName(), request.getId()));
+					ProxyUtil.sendMessage(channel, request);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
